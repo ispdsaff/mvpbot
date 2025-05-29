@@ -256,7 +256,12 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, request_product_info))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, generate_review_or_question_response))
     
-    application.run_polling()
+    application.run_webhook(
+    listen="0.0.0.0",
+    port=int(os.getenv("PORT", 8000)),
+    url_path=os.getenv("BOT_TOKEN"),  # URL-путь = ваш BOT_TOKEN
+    webhook_url=f"https://{os.getenv('RENDER_SERVICE_NAME')}.onrender.com/{os.getenv('BOT_TOKEN')}"
+)
 
 if __name__ == '__main__':
     main()
