@@ -69,7 +69,8 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("Генерация ответов на отзывы и вопросы", callback_data='reviews_submenu')],
         [InlineKeyboardButton("Как пользоваться", callback_data='instructions')],
         [InlineKeyboardButton("Оплата и тарифы", callback_data='payment')],
-        [InlineKeyboardButton("Профиль", callback_data='profile')]
+        [InlineKeyboardButton("Профиль", callback_data='profile')],
+        [InlineKeyboardButton("Назад", callback_data='choose_marketplace')]  # Кнопка "Назад"
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(f"Вы в главном меню. Текущий маркетплейс: {marketplace}", reply_markup=reply_markup)
@@ -78,7 +79,12 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def describe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("Введите характеристики товара (например, 'платье красное, размеры S-XXL, материал — шифон'):")
+    keyboard = [[InlineKeyboardButton("Назад", callback_data='main_menu')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        "Введите характеристики товара (например, 'платье красное, размеры S-XXL, материал — шифон')",
+        reply_markup=reply_markup
+    )
 
 async def generate_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -107,7 +113,12 @@ async def generate_description(update: Update, context: ContextTypes.DEFAULT_TYP
 async def keywords(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("Введите тематику товара (например, 'спортивные футболки'):")
+    keyboard = [[InlineKeyboardButton("Назад", callback_data='main_menu')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        "Введите тематику товара (например, 'спортивные футболки')",
+        reply_markup=reply_markup
+    )
 
 async def analyze_keywords(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -147,13 +158,17 @@ async def request_review_input(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
     context.user_data['review_type'] = 'review'
-    await query.edit_message_text("Введите текст негативного отзыва:")
+    keyboard = [[InlineKeyboardButton("Назад", callback_data='reviews_submenu')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text("Введите текст негативного отзыва:", reply_markup=reply_markup)
 
 async def request_question_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data['review_type'] = 'question'
-    await query.edit_message_text("Введите текст вопроса:")
+    keyboard = [[InlineKeyboardButton("Назад", callback_data='reviews_submenu')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text("Введите текст вопроса:", reply_markup=reply_markup)
 
 async def request_product_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
@@ -248,7 +263,7 @@ def main():
     application.add_handler(CallbackQueryHandler(payment, pattern='payment'))
     application.add_handler(CallbackQueryHandler(profile, pattern='profile'))
     application.add_handler(CallbackQueryHandler(instructions, pattern='instructions'))
-    application.add_handler(CallbackQueryHandler(main_menu, pattern='main_menu'))
+    application.add_handler(CallbackQueryHandler(main_menu, pattern='main_menu'))  # Обработчик для кнопки "Назад"
     
     # Сообщения
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, generate_description))
@@ -257,11 +272,11 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, generate_review_or_question_response))
     
     application.run_webhook(
-    listen="0.0.0.0",
-    port=int(os.getenv("PORT", 8000)),
-    url_path=os.getenv("BOT_TOKEN"),
-    webhook_url=f"https://{os.getenv('RENDER_SERVICE_NAME')}.onrender.com/{os.getenv('BOT_TOKEN')}"
-)
+        listen="0.0.0.0",
+        port=int(os.getenv("PORT", 8000)),
+        url_path=os.getenv("BOT_TOKEN"),
+        webhook_url=f"https://{os.getenv('RENDER_SERVICE_NAME')}.onrender.com/{os.getenv('BOT_TOKEN')}"
+    )
 
 if __name__ == '__main__':
     main()
