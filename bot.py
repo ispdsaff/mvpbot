@@ -59,10 +59,21 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = str(update.effective_user.id)
     users = load_users()
-    marketplace = query.data
-    users[user_id] = {"marketplace": marketplace, "tariff": "free", "requests_left": 3}
-    save_users(users)
     
+    # Если пользователь новый или не содержит всех ключей — добавляем их
+    if user_id not in users or any(key not in users[user_id] for key in ["marketplace", "tariff", "requests_left", "subscription_until"]):
+        marketplace = query.data
+        users[user_id] = {
+            "marketplace": marketplace,
+            "tariff": "free",
+            "requests_left": 3,
+            "subscription_until": "none"
+        }
+        save_users(users)
+    else:
+        users[user_id]["marketplace"] = query.data  # Обновляем маркетплейс
+        save_users(users)
+
     keyboard = [
         [InlineKeyboardButton("Генерация описаний", callback_data='describe')],
         [InlineKeyboardButton("Анализ ключевых слов", callback_data='keywords')],
@@ -73,7 +84,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("Назад", callback_data='choose_marketplace')]  # Кнопка "Назад"
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(f"Вы в главном меню. Текущий маркетплейс: {marketplace}", reply_markup=reply_markup)
+    await query.edit_message_text(f"Вы в главном меню. Текущий маркетплейс: {users[user_id]['marketplace']}", reply_markup=reply_markup)
 
 # === Функция 1: Генерация описаний ===
 async def describe(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -92,11 +103,11 @@ async def generate_description(update: Update, context: ContextTypes.DEFAULT_TYP
     if users[user_id]["requests_left"] <= 0:
         await update.message.reply_text("У вас закончились бесплатные запросы. Перейдите в 'Оплата и тарифы' для покупки подписки.")
         return
-    
+
     product_info = update.message.text
     marketplace = users[user_id]["marketplace"]
     prompt = generate_description_prompt(product_info, marketplace)
-    
+
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
@@ -126,10 +137,10 @@ async def analyze_keywords(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if users[user_id]["requests_left"] <= 0:
         await update.message.reply_text("У вас закончились бесплатные запросы. Перейдите в 'Оплата и тарифы' для покупки подписки.")
         return
-    
+
     topic = update.message.text
     prompt = generate_keywords_prompt(topic)
-    
+
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
@@ -181,13 +192,12 @@ async def generate_review_or_question_response(update: Update, context: ContextT
     if users[user_id]["requests_left"] <= 0:
         await update.message.reply_text("У вас закончились бесплатные запросы. Перейдите в 'Оплата и тарифы' для покупки подписки.")
         return
-    
+
     product_info = update.message.text
     user_input = context.user_data.get('user_input', '')
     review_type = context.user_data.get('review_type', 'review')
-    
     prompt = generate_review_prompt(user_input, product_info)
-    
+
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
@@ -220,14 +230,21 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = str(update.effective_user.id)
     users = load_users()
-    data = users.get(user_id, {"requests_left": 3, "tariff": "free", "subscription_until": "none"})
+    
+    # Используем .get() с дефолтными значениями
+    data = users.get(user_id, {
+        "requests_left": 3,
+        "tariff": "free",
+        "subscription_until": "none"
+    })
+    
     keyboard = [[InlineKeyboardButton("Назад", callback_data='main_menu')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(
         f"Ваш профиль:\n"
-        f"Статус тарифа: {data['tariff']}\n"
-        f"Остаток запросов: {data['requests_left']}/3\n"
-        f"Подписка до: {data['subscription_until']}",
+        f"Статус тарифа: {data.get('tariff', 'free')}\n"
+        f"Остаток запросов: {data.get('requests_left', 3)}/3\n"
+        f"Подписка до: {data.get('subscription_until', 'none')}",
         reply_markup=reply_markup
     )
 
@@ -248,10 +265,10 @@ async def instructions(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # === Запуск бота ===
 def main():
     application = Application.builder().token(BOT_TOKEN).build()
-    
+
     # Команды
     application.add_handler(CommandHandler("start", start))
-    
+
     # Callback-обработчики
     application.add_handler(CallbackQueryHandler(choose_marketplace, pattern='choose_marketplace'))
     application.add_handler(CallbackQueryHandler(main_menu, pattern='wildberries|ozon'))
@@ -263,14 +280,14 @@ def main():
     application.add_handler(CallbackQueryHandler(payment, pattern='payment'))
     application.add_handler(CallbackQueryHandler(profile, pattern='profile'))
     application.add_handler(CallbackQueryHandler(instructions, pattern='instructions'))
-    application.add_handler(CallbackQueryHandler(main_menu, pattern='main_menu'))  # Обработчик для кнопки "Назад"
-    
+    application.add_handler(CallbackQueryHandler(main_menu, pattern='main_menu'))
+
     # Сообщения
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, generate_description))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_keywords))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, request_product_info))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, generate_review_or_question_response))
-    
+
     application.run_webhook(
         listen="0.0.0.0",
         port=int(os.getenv("PORT", 8000)),
